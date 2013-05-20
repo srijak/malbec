@@ -69,11 +69,16 @@ func (ic *IMAPConnection) Examine(mbox string) (status *MboxStatus, err error){
 }
 
 func (ic *IMAPConnection) FetchAllUids(mbox string, chunk_chan chan uint32) (err error){
+  tm := NewTimer()
+  tm.Add("Select")
+
   ic.conn.Select(mbox, true)
+  tm.Add("Select Done")
   
   set, _ := imap.NewSeqSet("1:*")
-  cmd, err := ic.conn.UIDFetch(set, "")
 
+  tm.Add("FetchAll")
+  cmd, err := ic.conn.UIDFetch(set, "")
   for cmd.InProgress() {
     ic.conn.Recv(-1)
     for _, rsp := range cmd.Data {
@@ -83,6 +88,8 @@ func (ic *IMAPConnection) FetchAllUids(mbox string, chunk_chan chan uint32) (err
     cmd.Data = nil
   }
 
+  tm.Add("FetchAll Done")
+  tm.Report()
   return nil
 }
 
@@ -121,6 +128,18 @@ func fetch(c *IMAPConnection, mbox string, uid_chan chan uint32) {
 
 }
 
+func (ic *IMAPConnection) VerifyConnected() (err error) {
+  if ic.conn.State() == imap.Closed{
+    ic.conn, err = connect(ic.Account.Server)
+  }
+  if err != nil {
+    return
+  }
+  if ic.conn.State() == imap.Logout {
+    ic.login(ic.Account)
+  }
+  return
+}
 
 func (ic *IMAPConnection) Mailboxes() (mboxes []*MboxInfo, err error){
   cmd, err := imap.Wait(ic.conn.List("", "*"))
@@ -161,8 +180,7 @@ func main(){
     ic.FetchAllUids("INBOX", cc)
   }()
 
-  fetcher, err := NewIMAPConnection(acct)
-  
+//  fetcher, err := NewIMAPConnection(acct)
   for {
     uid := <- cc
     log.Printf("%v", uid)
