@@ -5,19 +5,111 @@ import (
 	"fmt"
 	"log"
 	"net/mail"
+	"database/sql"
+//	"encoding/json"
+	_ "github.com/mattn/go-sqlite3"
+  "os"
+  "path"
+  "io/ioutil"
 )
 
 type EmailProcessor interface {
-	Add(acct *IMAPAccount, mbox_name string, uid uint32, msg *mail.Message) (err error)
+	Add(acct *IMAPAccount, mbox_name string, uid uint32, flags string, msg *mail.Message) (err error)
+}
+
+type SqliteEmailProcessor struct {
+  folder string
+  conns map[string]*sql.DB
+}
+
+func NewSqliteEmailProcessor(folder string) (s *SqliteEmailProcessor) {
+  // if folder doesn't exist, create it
+  // then open up the metadata file in it, or create if it doesn't exist 
+  // the metadata folder will store 
+  os.MkdirAll(folder, 0700)
+  s = &SqliteEmailProcessor{folder: folder}
+  return
+}
+
+func (s *SqliteEmailProcessor) getIndexFor(mbox_name string) (db *sql.DB){
+  folder := path.Join(s.folder, mbox_name)
+  os.MkdirAll(folder, 0700)
+  filename := path.Join(folder, "index")
+
+  if s.conns  == nil {
+    s.conns = make(map[string]*sql.DB, 10)
+  }
+  db, present := s.conns[filename]
+	if !present {
+    db, _ = sql.Open("sqlite3", filename)
+    _, err := db.Exec("CREATE TABLE IF NOT EXISTS uids " +
+      "(pk INTEGER PRIMARY KEY, uid INTEGER, deleted INTEGER); ")
+    _, err = db.Exec("create index idx_uid_key on uids(uid)")
+    if err != nil {
+      log.Printf("\n\nError creating table: %v \n\n", err)
+    }
+  }
+  if db != nil {
+    s.conns[filename] = db
+  }
+
+  return
+}
+
+func (s *SqliteEmailProcessor) addToIndex(acct *IMAPAccount, mbox_name string, uid uint32) (err error){
+  idx := s.getIndexFor(mbox_name)
+	cmd := "insert into uids(uid, deleted) " +
+		" VALUES (?,?) "
+	_, err = idx.Exec(cmd, uid, 0)
+  if err != nil {
+    log.Printf("Error inserting uid %v for mailbox [%v] ", uid, mbox_name)
+  }
+  return
+}
+
+func (s *SqliteEmailProcessor) Add(acct *IMAPAccount, mbox_name string, uid uint32,flags string, msg *mail.Message) (err error){
+  folder := path.Join(s.folder, mbox_name)
+  os.MkdirAll(folder, 0700)
+
+  file := path.Join(folder, fmt.Sprintf("%d", uid))
+
+  log.Printf("Writing %v to file: %v", uid, file)
+
+
+
+	var msgdata = map[string]string{}
+
+	for headerkey := range msg.Header {
+	  val := msg.Header.Get(headerkey)
+	  msgdata[headerkey] = val
+	}
+
+	msgdata["imap_uid"] = fmt.Sprintf("%d", uid)
+	   if b, err := TextBody(msg); err == nil {
+	     msgdata["text_body"] = b
+	   }
+	   if b, err := HTMLBody(msg); err == nil {
+	     msgdata["html_body"] = b
+	   }
+	o, err := json.Marshal(msgdata)
+	if err != nil {
+		log.Println("error marshaling message as JSON: ", err.Error()[:100])
+    ioutil.WriteFile(file+".ERR", []byte(fmt.Sprintf("Error decoding message body: %v", err.Error())), 0700)
+	} else {
+    ioutil.WriteFile(file, o, 0700)
+	}
+  s.addToIndex(acct, mbox_name, uid)
+  return nil
 }
 
 type PrintingEmailProcessor struct {
 	MetadataService MetadataService
 }
 
-func (p *PrintingEmailProcessor) Add(account *IMAPAccount, mbox_name string, uid uint32, msg *mail.Message) (err error) {
+func (p *PrintingEmailProcessor) Add(account *IMAPAccount, mbox_name string, uid uint32, flags string, msg *mail.Message) (err error) {
 	var msgdata = map[string]string{}
 
+  log.Printf("FLAGS: %v", flags)
 	/*for headerkey := range msg.Header {
 	  val := msg.Header.Get(headerkey)
 	  msgdata[headerkey] = val

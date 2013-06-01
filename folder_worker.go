@@ -113,7 +113,7 @@ func (f *FolderWorker) fetchNewMessages(uids *imap.SeqSet) (uid_next uint32, err
 		return
 	}
 	log.Printf("Fetching range: %v", uids)
-	cmd, err := c.conn.UIDFetch(uids, "RFC822")
+	cmd, err := c.conn.UIDFetch(uids, "RFC822", "FLAGS")
 	if err != nil {
 		log.Printf("Unable to fetch %v", err)
 		return
@@ -125,9 +125,10 @@ func (f *FolderWorker) fetchNewMessages(uids *imap.SeqSet) (uid_next uint32, err
 			uid := imap.AsNumber(rsp.MessageInfo().Attrs["UID"])
 			uid_next = uint32(uid) + 1
 			mime := imap.AsBytes(rsp.MessageInfo().Attrs["RFC822"])
+			flags := imap.AsString(rsp.MessageInfo().Attrs["FLAGS"])
 
 			if msg, _ := mail.ReadMessage(bytes.NewReader(mime)); msg != nil {
-				f.ep.Add(f.Account, f.Folder, uid, msg)
+				f.ep.Add(f.Account, f.Folder, uid,flags, msg)
 			}
 			cmd.Data = nil
 		}

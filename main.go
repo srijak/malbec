@@ -13,7 +13,7 @@ func main() {
 
 	acct := &IMAPAccount{Username: "vfct3st@gmail.com", Password: "GWxE6kBs436wa7tyedyU", Server: GmailServer()}
 	ms := NewSqliteMetadata("metadata.sqlite")
-	ep := &PrintingEmailProcessor{MetadataService: ms}
+  ep := &SqliteEmailProcessor{folder: "storage"}
 
 	ic, err := NewIMAPConnection(acct)
 	if err != nil {
