@@ -179,16 +179,18 @@ func NewFromMailboxStatus(ms *imap.MailboxStatus) (m *MboxStatus) {
 		Messages:    ms.Messages,
 		Recent:      ms.Recent,
 	}
-	m.Flags = make(Flags, len(ms.Flags))
-	for k, v := range ms.Flags {
-		m.Flags[k] = v
-	}
-	m.PermFlags = make(Flags, len(ms.PermFlags))
-	for k, v := range ms.PermFlags {
-		m.PermFlags[k] = v
-	}
+	m.Flags = NewFlagsFromFlagset(ms.Flags)
+	m.PermFlags = NewFlagsFromFlagset(ms.PermFlags)
 	m.Uids = make(map[uint]bool, 100)
 	return m
+}
+
+func NewFlagsFromFlagset(fs imap.FlagSet) (flags Flags){
+	flags = make(Flags, len(fs))
+	for k, v := range fs {
+		flags[k] = v
+	}
+  return
 }
 
 func NewMboxStatus() (m *MboxStatus) {

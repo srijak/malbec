@@ -125,10 +125,11 @@ func (f *FolderWorker) fetchNewMessages(uids *imap.SeqSet) (uid_next uint32, err
 			uid := imap.AsNumber(rsp.MessageInfo().Attrs["UID"])
 			uid_next = uint32(uid) + 1
 			mime := imap.AsBytes(rsp.MessageInfo().Attrs["RFC822"])
-			flags := imap.AsString(rsp.MessageInfo().Attrs["FLAGS"])
+			flags := NewFlagsFromFlagset(rsp.MessageInfo().Flags)
 
+      log.Printf("flags: [%v]", flags)
 			if msg, _ := mail.ReadMessage(bytes.NewReader(mime)); msg != nil {
-				f.ep.Add(f.Account, f.Folder, uid,flags, msg)
+				f.ep.Add(f.Account, f.Folder, uid, flags,msg)
 			}
 			cmd.Data = nil
 		}

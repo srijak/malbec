@@ -14,7 +14,7 @@ import (
 )
 
 type EmailProcessor interface {
-	Add(acct *IMAPAccount, mbox_name string, uid uint32, flags string, msg *mail.Message) (err error)
+	Add(acct *IMAPAccount, mbox_name string, uid uint32, flags Flags, msg *mail.Message) (err error)
 }
 
 type SqliteEmailProcessor struct {
@@ -43,7 +43,7 @@ func (s *SqliteEmailProcessor) getIndexFor(mbox_name string) (db *sql.DB){
 	if !present {
     db, _ = sql.Open("sqlite3", filename)
     _, err := db.Exec("CREATE TABLE IF NOT EXISTS uids " +
-      "(pk INTEGER PRIMARY KEY, uid INTEGER, deleted INTEGER); ")
+      "(pk INTEGER PRIMARY KEY, uid INTEGER, deleted INTEGER, flags TEXT); ")
     _, err = db.Exec("create index idx_uid_key on uids(uid)")
     if err != nil {
       log.Printf("\n\nError creating table: %v \n\n", err)
@@ -56,18 +56,20 @@ func (s *SqliteEmailProcessor) getIndexFor(mbox_name string) (db *sql.DB){
   return
 }
 
-func (s *SqliteEmailProcessor) addToIndex(acct *IMAPAccount, mbox_name string, uid uint32) (err error){
+func (s *SqliteEmailProcessor) addToIndex(acct *IMAPAccount, mbox_name string, flags Flags, uid uint32) (err error){
   idx := s.getIndexFor(mbox_name)
-	cmd := "insert into uids(uid, deleted) " +
-		" VALUES (?,?) "
-	_, err = idx.Exec(cmd, uid, 0)
+  log.Printf("\n\tInserting uid: %v  flags: %v", uid, flags)
+	cmd := "insert into uids(uid, deleted, flags) " +
+		" VALUES (?,?,?) "
+    flag_json, _ := json.Marshal(flags)
+	_, err = idx.Exec(cmd, uid, 0, string(flag_json))
   if err != nil {
     log.Printf("Error inserting uid %v for mailbox [%v] ", uid, mbox_name)
   }
   return
 }
 
-func (s *SqliteEmailProcessor) Add(acct *IMAPAccount, mbox_name string, uid uint32,flags string, msg *mail.Message) (err error){
+func (s *SqliteEmailProcessor) Add(acct *IMAPAccount, mbox_name string, uid uint32,flags Flags, msg *mail.Message) (err error){
   folder := path.Join(s.folder, mbox_name)
   os.MkdirAll(folder, 0700)
 
@@ -98,7 +100,7 @@ func (s *SqliteEmailProcessor) Add(acct *IMAPAccount, mbox_name string, uid uint
 	} else {
     ioutil.WriteFile(file, o, 0700)
 	}
-  s.addToIndex(acct, mbox_name, uid)
+  s.addToIndex(acct, mbox_name,flags, uid)
   return nil
 }
 
