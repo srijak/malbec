@@ -98,7 +98,6 @@ type MboxStatus struct {
 	Unseen      uint32
 	Flags       Flags
 	PermFlags   Flags
-	Uids        Uids
 }
 
 func (f Flags) Equals(o Flags) bool {
@@ -152,9 +151,6 @@ func (m *MboxStatus) Equals(o *MboxStatus) bool {
 	if !m.PermFlags.Equals(o.PermFlags) {
 		return false
 	}
-	if !m.Uids.Equals(o.Uids) {
-		return false
-	}
 
 	return true
 }
@@ -181,7 +177,6 @@ func NewFromMailboxStatus(ms *imap.MailboxStatus) (m *MboxStatus) {
 	}
 	m.Flags = NewFlagsFromFlagset(ms.Flags)
 	m.PermFlags = NewFlagsFromFlagset(ms.PermFlags)
-	m.Uids = make(map[uint]bool, 100)
 	return m
 }
 
@@ -199,6 +194,5 @@ func NewMboxStatus() (m *MboxStatus) {
 	m.Flags = make(Flags, 5)
 	m.PermFlags = make(Flags, 5)
 
-	m.Uids = make(map[uint]bool, 100)
 	return m
 }
