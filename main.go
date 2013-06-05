@@ -4,9 +4,34 @@ import (
 	"code.google.com/p/go-imap/go1/imap"
 	"log"
 	"os"
+  "github.com/gorilla/mux"
+  "net/http"
+  "fmt"
+  "code.google.com/p/go.net/websocket"
+  l4g "code.google.com/p/log4go"
 )
 
+func VersionHandler(w http.ResponseWriter, req *http.Request){
+  fmt.Fprintf(w, "HI")
+}
+
 func main() {
+  r := mux.NewRouter()
+  l4g.Info("Starting.")
+
+  r.Handle("/ws", websocket.Handler(wsHandler))
+  r.PathPrefix("/").Handler(http.FileServer(http.Dir("./www/")))
+  http.Handle("/", r)
+  l4g.Info("Serving...")
+  err := http.ListenAndServe(":8081", nil)
+
+  if err != nil {
+    l4g.Info("Error serving: %v", err)
+  }
+
+}
+
+func haha(){
 	imap.DefaultLogger = log.New(os.Stdout, "", 0)
 	//imap.DefaultLogMask = imap.LogConn | imap.LogRaw
 	imap.DefaultLogMask = imap.LogConn
@@ -27,7 +52,7 @@ func main() {
 		if !present {
 			fw := NewFolderWorker(m.Name, acct, ms, ep)
 			fw.run()
-			log.Printf("Synced mailbox: %v", m.Name)
+			l4g.Info("Synced mailbox: %v", m.Name)
 		}
 	}
 
@@ -44,7 +69,7 @@ func main() {
 	    _, present := m.Attrs["\\Noselect"]
 	    if ! present {
 	      status, _:= ic.Examine(m.Name)
-	      log.Printf("status: %v\n", status)
+	      l4g.Info("status: %v\n", status)
 	      a.SetMbox(*status)
 	    }
 	  }
@@ -58,7 +83,7 @@ func main() {
 	//  fetcher, err := NewIMAPConnection(acct)
 	  for {
 	    uid := <- cc
-	    log.Printf("%v", uid)
+	    l4g.Info("%v", uid)
 	  }
 	*/
 }
