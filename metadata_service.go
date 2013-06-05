@@ -10,11 +10,70 @@ import (
 type MetadataService interface {
 	MboxStatus(account *IMAPAccount, name string) (status *MboxStatus, first_sync bool)
 	SaveMboxStatus(account *IMAPAccount, mbox *MboxStatus) (err error)
+  AccountsAndMailboxes() (res map[string]MboxSet)
 }
 
 type SqliteMetadata struct {
 	filename string
 	db       *sql.DB
+}
+
+func (s *SqliteMetadata) AccountsAndMailboxes() (res map[string]MboxSet) {
+
+  res = make(map[string]MboxSet, 10)
+	cmd := "select pk, name, flags, perm_flags, messages, recent, unseen, uid_next, uid_validity, email " +
+		" from mailbox_status "
+
+	stmt, _ := s.db.Prepare(cmd)
+	defer stmt.Close()
+	var id int64
+	var flags []byte
+	var perm_flags []byte
+  rows, err := stmt.Query()
+  switch {
+    case err == sql.ErrNoRows:
+      log.Printf("No rows returned.")
+      return
+    case err != nil:
+      log.Printf("\n\nError querying db: %v\n\n", err)
+      return
+  }
+
+  defer rows.Close()
+  for rows.Next() {
+    var status MboxStatus
+    var email string
+
+    err = rows.Scan(&id, &(status.Name), &flags, &perm_flags, &(status.Messages), &(status.Recent), &(status.Unseen), &(status.UIDNext), &(status.UIDValidity), &email)
+    if err != nil {
+      log.Printf("Error scanning row.")
+      err = nil
+    }
+    
+    err = json.Unmarshal(flags, &(status.Flags))
+    if err != nil {
+      log.Printf("Error unmarshalling: %v to Flags", string(flags))
+      err = nil
+    }
+    err = json.Unmarshal(perm_flags, &(status.PermFlags))
+    if err != nil {
+      log.Printf("Error unmarshalling: %v to Flags", string(perm_flags))
+      err = nil
+    }
+    
+    log.Printf("loaded mbox: %v", status)
+
+    // add it to the map
+    //  first, check to see if the map has teh account.
+    //  if so, add to it, otherwise create a new key etcs
+    if _, ok := res[email]; !ok {
+      res[email] = make(MboxSet, 10)
+    }
+    res[email][status.Name] = status
+  }
+
+  return
+
 }
 
 func (s *SqliteMetadata) MboxStatus(acct *IMAPAccount, name string) (status *MboxStatus, first_sync bool) {
