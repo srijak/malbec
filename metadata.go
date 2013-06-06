@@ -174,6 +174,7 @@ func NewFromMailboxStatus(ms *imap.MailboxStatus) (m *MboxStatus) {
 		UIDNext:     ms.UIDNext,
 		Messages:    ms.Messages,
 		Recent:      ms.Recent,
+    Unseen:      ms.Unseen,
 	}
 	m.Flags = NewFlagsFromFlagset(ms.Flags)
 	m.PermFlags = NewFlagsFromFlagset(ms.PermFlags)
