@@ -16,6 +16,8 @@ func VersionHandler(w http.ResponseWriter, req *http.Request){
 }
 
 func main() {
+  go syncMail()
+
   r := mux.NewRouter()
   l4g.Info("Starting.")
 
@@ -31,9 +33,9 @@ func main() {
 
 }
 
-func haha(){
+func syncMail(){
 	imap.DefaultLogger = log.New(os.Stdout, "", 0)
-	//imap.DefaultLogMask = imap.LogConn | imap.LogRaw
+  //imap.DefaultLogMask = imap.LogConn | imap.LogRaw
 	imap.DefaultLogMask = imap.LogConn
 
 	acct := &IMAPAccount{Username: "vfct3st@gmail.com", Password: "GWxE6kBs436wa7tyedyU", Server: GmailServer()}

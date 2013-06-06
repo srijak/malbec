@@ -17,6 +17,7 @@ type ClientConn struct {
 type WebsocketCommand struct {
   Type string
   Callback_Id int
+  Params map[string]string
 }
 
 func publish(msg interface{}){
