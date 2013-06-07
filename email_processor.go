@@ -11,6 +11,7 @@ import (
   "os"
   "path"
   "io/ioutil"
+  "time"
 )
 
 type EmailProcessor interface {
@@ -44,7 +45,7 @@ func (s *SqliteEmailProcessor) getIndexFor(mbox_name string) (db *sql.DB){
     db, _ = sql.Open("sqlite3", filename)
     _, err := db.Exec("CREATE VIRTUAL TABLE IF NOT EXISTS uids USING fts4" +
       " (pk INTEGER PRIMARY KEY, uid INTEGER, deleted INTEGER, flags TEXT, " +
-      "  subject TEXT, frm_em TEXT, cc TEXT, to_em TEXT, account varchar(256), mbox TEXT" +
+      "  subject TEXT, frm_em TEXT, cc TEXT, to_em TEXT, deliver_date integer, account varchar(256), mbox TEXT" +
       " ); ")
     _, err = db.Exec("create index idx_uid_key on uids(uid)")
     if err != nil {
@@ -58,14 +59,14 @@ func (s *SqliteEmailProcessor) getIndexFor(mbox_name string) (db *sql.DB){
   return
 }
 
-func (s *SqliteEmailProcessor) addToIndex(acct *IMAPAccount, mbox_name , subject, from, cc, to string, flags Flags, uid uint32) (err error){
+func (s *SqliteEmailProcessor) addToIndex(acct *IMAPAccount, mbox_name , subject, from, cc, to string, date int64, flags Flags, uid uint32) (err error){
   idx := s.getIndexFor(mbox_name)
 
-  log.Printf("\n\tInserting uid: %v  flags: %v", uid, flags, subject, from, cc, to, mbox_name, acct.Username)
-	cmd := "insert into uids(uid, deleted, flags, subject, frm_em, cc, to_em, mbox, account) " +
-		" VALUES (?,?,?,?,?,?,?,?,?) "
+  log.Printf("\n\tInserting uid: %v  flags: %v", uid, flags, subject, from, cc, to,date, mbox_name, acct.Username)
+	cmd := "insert into uids(uid, deleted, flags, subject, frm_em, cc, to_em, deliver_date, mbox, account) " +
+		" VALUES (?,?,?,?,?,?,?,?,?,?) "
     flag_json, _ := json.Marshal(flags)
-	_, err = idx.Exec(cmd, uid, 0, string(flag_json), subject, from, cc, to, mbox_name, acct.Username)
+	_, err = idx.Exec(cmd, uid, 0, string(flag_json), subject, from, cc, to, date, mbox_name, acct.Username)
   if err != nil {
     log.Printf("Error inserting uid %v for mailbox [%v]. \n\tError: %v", uid, mbox_name, err)
   }
@@ -88,6 +89,11 @@ func (s *SqliteEmailProcessor) Add(acct *IMAPAccount, mbox_name string, uid uint
 	  val := msg.Header.Get(headerkey)
 	  msgdata[headerkey] = val
 	}
+  date_time, err := msg.Header.Date()
+  var date_timestamp int64 = -1
+  if err == nil {
+    date_timestamp = date_time.Unix() 
+  }
 
 	msgdata["imap_uid"] = fmt.Sprintf("%d", uid)
 	   if b, err := TextBody(msg); err == nil {
@@ -109,9 +115,18 @@ func (s *SqliteEmailProcessor) Add(acct *IMAPAccount, mbox_name string, uid uint
   from := msgdata["From"]
   cc := msgdata["Cc"]
   to := msgdata["To"]
-  s.addToIndex(acct, mbox_name, subject, from, cc, to, flags, uid)
+  s.addToIndex(acct, mbox_name, subject, from, cc, to, date_timestamp, flags, uid)
 
   return nil
+}
+
+func parseDate(in string) (ts int64) {
+  t, err := time.Parse("Mon, 02 Jan 2006 15:04:05 -0700", in)
+  if err != nil {
+    log.Printf("Start date: [%v]  Timestamp:[%v] String():[%v]", in, t.Unix() ,t.String())
+    return t.Unix()
+  }
+  return -1
 }
 
 type PrintingEmailProcessor struct {
