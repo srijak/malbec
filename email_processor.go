@@ -44,7 +44,7 @@ func (s *SqliteEmailProcessor) getIndexFor(mbox_name string) (db *sql.DB){
     db, _ = sql.Open("sqlite3", filename)
     _, err := db.Exec("CREATE VIRTUAL TABLE IF NOT EXISTS uids USING fts4" +
       " (pk INTEGER PRIMARY KEY, uid INTEGER, deleted INTEGER, flags TEXT, " +
-      "  subject TEXT, from TEXT, cc TEXT, to TEXT, account varchar(256), mbox TEXT" +
+      "  subject TEXT, frm_em TEXT, cc TEXT, to_em TEXT, account varchar(256), mbox TEXT" +
       " ); ")
     _, err = db.Exec("create index idx_uid_key on uids(uid)")
     if err != nil {
@@ -62,12 +62,12 @@ func (s *SqliteEmailProcessor) addToIndex(acct *IMAPAccount, mbox_name , subject
   idx := s.getIndexFor(mbox_name)
 
   log.Printf("\n\tInserting uid: %v  flags: %v", uid, flags, subject, from, cc, to, mbox_name, acct.Username)
-	cmd := "insert into uids(uid, deleted, flags, subject, from, cc, to, mbox, account) " +
+	cmd := "insert into uids(uid, deleted, flags, subject, frm_em, cc, to_em, mbox, account) " +
 		" VALUES (?,?,?,?,?,?,?,?,?) "
     flag_json, _ := json.Marshal(flags)
-	_, err = idx.Exec(cmd, uid, 0, string(flag_json))
+	_, err = idx.Exec(cmd, uid, 0, string(flag_json), subject, from, cc, to, mbox_name, acct.Username)
   if err != nil {
-    log.Printf("Error inserting uid %v for mailbox [%v] ", uid, mbox_name)
+    log.Printf("Error inserting uid %v for mailbox [%v]. \n\tError: %v", uid, mbox_name, err)
   }
   return
 }
@@ -105,10 +105,10 @@ func (s *SqliteEmailProcessor) Add(acct *IMAPAccount, mbox_name string, uid uint
 	}
 
   //func (s *SqliteEmailProcessor) addToIndex(acct *IMAPAccount, mbox_name string, subject, from, cc, to, flags Flags, uid uint32) (err error){
-  subject := "hi"
-  from := "hello"
-  cc := "cced to"
-  to := "to"
+  subject := msgdata["Subject"]
+  from := msgdata["From"]
+  cc := msgdata["Cc"]
+  to := msgdata["To"]
   s.addToIndex(acct, mbox_name, subject, from, cc, to, flags, uid)
 
   return nil
