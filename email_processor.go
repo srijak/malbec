@@ -32,7 +32,7 @@ func NewSqliteEmailProcessor(folder string) (s *SqliteEmailProcessor) {
 }
 
 func (s *SqliteEmailProcessor) getIndexFor(mbox_name string) (db *sql.DB){
-  folder := path.Join(s.folder, mbox_name)
+  folder := path.Join(s.folder, "index")
   os.MkdirAll(folder, 0700)
   filename := path.Join(folder, "index")
 
@@ -42,8 +42,10 @@ func (s *SqliteEmailProcessor) getIndexFor(mbox_name string) (db *sql.DB){
   db, present := s.conns[filename]
 	if !present {
     db, _ = sql.Open("sqlite3", filename)
-    _, err := db.Exec("CREATE TABLE IF NOT EXISTS uids " +
-      "(pk INTEGER PRIMARY KEY, uid INTEGER, deleted INTEGER, flags TEXT); ")
+    _, err := db.Exec("CREATE VIRTUAL TABLE IF NOT EXISTS uids USING fts4" +
+      " (pk INTEGER PRIMARY KEY, uid INTEGER, deleted INTEGER, flags TEXT, " +
+      "  subject TEXT, from TEXT, cc TEXT, to TEXT, account varchar(256), mbox TEXT" +
+      " ); ")
     _, err = db.Exec("create index idx_uid_key on uids(uid)")
     if err != nil {
       log.Printf("\n\nError creating table: %v \n\n", err)
@@ -56,11 +58,12 @@ func (s *SqliteEmailProcessor) getIndexFor(mbox_name string) (db *sql.DB){
   return
 }
 
-func (s *SqliteEmailProcessor) addToIndex(acct *IMAPAccount, mbox_name string, flags Flags, uid uint32) (err error){
+func (s *SqliteEmailProcessor) addToIndex(acct *IMAPAccount, mbox_name , subject, from, cc, to string, flags Flags, uid uint32) (err error){
   idx := s.getIndexFor(mbox_name)
-  log.Printf("\n\tInserting uid: %v  flags: %v", uid, flags)
-	cmd := "insert into uids(uid, deleted, flags) " +
-		" VALUES (?,?,?) "
+
+  log.Printf("\n\tInserting uid: %v  flags: %v", uid, flags, subject, from, cc, to, mbox_name, acct.Username)
+	cmd := "insert into uids(uid, deleted, flags, subject, from, cc, to, mbox, account) " +
+		" VALUES (?,?,?,?,?,?,?,?,?) "
     flag_json, _ := json.Marshal(flags)
 	_, err = idx.Exec(cmd, uid, 0, string(flag_json))
   if err != nil {
@@ -70,7 +73,7 @@ func (s *SqliteEmailProcessor) addToIndex(acct *IMAPAccount, mbox_name string, f
 }
 
 func (s *SqliteEmailProcessor) Add(acct *IMAPAccount, mbox_name string, uid uint32,flags Flags, msg *mail.Message) (err error){
-  folder := path.Join(s.folder, mbox_name)
+  folder := path.Join(s.folder, "emails", mbox_name)
   os.MkdirAll(folder, 0700)
 
   file := path.Join(folder, fmt.Sprintf("%d", uid))
@@ -96,11 +99,18 @@ func (s *SqliteEmailProcessor) Add(acct *IMAPAccount, mbox_name string, uid uint
 	o, err := json.Marshal(msgdata)
 	if err != nil {
 		log.Println("error marshaling message as JSON: ", err.Error()[:100])
-    ioutil.WriteFile(file+".ERR", []byte(fmt.Sprintf("Error decoding message body: %v", err.Error())), 0700)
+    ioutil.WriteFile(file+".ERR", []byte(fmt.Sprintf("Error decoding message body: %v\nout: %v", err.Error(), o)), 0700)
 	} else {
     ioutil.WriteFile(file, o, 0700)
 	}
-  s.addToIndex(acct, mbox_name,flags, uid)
+
+  //func (s *SqliteEmailProcessor) addToIndex(acct *IMAPAccount, mbox_name string, subject, from, cc, to, flags Flags, uid uint32) (err error){
+  subject := "hi"
+  from := "hello"
+  cc := "cced to"
+  to := "to"
+  s.addToIndex(acct, mbox_name, subject, from, cc, to, flags, uid)
+
   return nil
 }
 

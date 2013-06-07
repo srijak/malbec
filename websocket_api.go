@@ -64,6 +64,19 @@ func getEmailsList(cmd *WebsocketCommand) (CommandResult){
                       Callback_Id: cmd.Callback_Id}
 }
 
+type EmailList uint
+func getEmailsListUnified(start uint) uint {
+  var page_size uint
+  page_size = 100
+  // hmm. yeah, maybe I want to always shard the
+  //  uids/emails db by dates. ie, store 1000 uids per db
+  //  that makes it easy to stream results back in sorted
+  //   date order, which is what people want anyway.
+  
+  return page_size
+  
+} 
+
 func getAccountMailboxMap(cmd *WebsocketCommand) (CommandResult){
   // look up the info from the db, always.
   // Except something else keep the db upto date.
