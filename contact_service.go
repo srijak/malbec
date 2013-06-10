@@ -39,10 +39,10 @@ func (c *SqliteContactService) getDbConn() (db *sql.DB){
   //  in contacts table and the contact_id set in the emails table.
   if c.conn  == nil {
     db, _ = sql.Open("sqlite3", filename)
-    _, err := db.Exec("CREATE VIRTUAL TABLE IF NOT EXISTS contacts USING fts4 " +
+    _, err := db.Exec("CREATE TABLE IF NOT EXISTS contacts " +
       " (id INTEGER PRIMARY KEY, name varchar(80) UNIQUE" +
       " ); ")
-    _, err = db.Exec("CREATE VIRTUAL TABLE IF NOT EXISTS emails USING fts4 " +
+    _, err = db.Exec("CREATE TABLE IF NOT EXISTS emails " +
       " (id INTEGER PRIMARY KEY, contact_id INTEGER, email varchar(256) UNIQUE, " +
       "  occurences INTEGER default 1, sent_invite INTEGER default 0 " +
       " ); ")
@@ -99,13 +99,17 @@ func (c *SqliteContactService) Add(name, email string) (err error){
   }
 
 
-  cmd := "insert into emails (email, contact_id) values(?, ?) " +
-  " on duplicate key update occurences = occurences + 1 ;";
+  cmd := "insert or ignore into emails (email, contact_id) values(?, ?); ";
+
+  update :=" update emails set occurences = occurences + 1  where email = ? ;";
 
   _, err = conn.Exec(cmd, email, contact_id)
+  _, err = conn.Exec(update, email)
   if err != nil {
     log.Printf("Error inserting contact. Name:[%v]  Email:[%v].  Error: %v", name, email, err )
   }
+
+  log.Printf("ADDED EMAIL: [%v]", email)
   
   return nil
 }

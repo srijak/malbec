@@ -16,19 +16,21 @@ import (
 
 type EmailProcessor interface {
 	Add(acct *IMAPAccount, mbox_name string, uid uint32, flags Flags, msg *mail.Message) (err error)
+  SparseEmailListUnified(start, sort int) (el *SparseEmailList)
 }
 
 type SqliteEmailProcessor struct {
   folder string
+  contactService ContactService
   conns map[string]*sql.DB
 }
 
-func NewSqliteEmailProcessor(folder string) (s *SqliteEmailProcessor) {
+func NewSqliteEmailProcessor(folder string, cs ContactService) (s *SqliteEmailProcessor) {
   // if folder doesn't exist, create it
   // then open up the metadata file in it, or create if it doesn't exist 
   // the metadata folder will store 
   os.MkdirAll(folder, 0700)
-  s = &SqliteEmailProcessor{folder: folder}
+  s = &SqliteEmailProcessor{folder: folder, contactService: cs}
   return
 }
 
@@ -115,6 +117,18 @@ func (s *SqliteEmailProcessor) Add(acct *IMAPAccount, mbox_name string, uid uint
   from := msgdata["From"]
   cc := msgdata["Cc"]
   to := msgdata["To"]
+
+
+  for _, k:= range [5]string { "From", "Cc", "To", "Bcc"}{
+    addresses, err := msg.Header.AddressList(k)
+    if err == nil {
+      for _, a := range addresses {
+        log.Printf("Adding [%v] under [%v]", a, k)
+        s.contactService.Add(a.Name, a.Address)
+      }
+    }
+  }
+
   s.addToIndex(acct, mbox_name, subject, from, cc, to, date_timestamp, flags, uid)
 
   return nil
@@ -158,4 +172,62 @@ func (p *PrintingEmailProcessor) Add(account *IMAPAccount, mbox_name string, uid
 		fmt.Println(string(o))
 	}
 	return nil
+}
+
+
+func (s *SqliteEmailProcessor) SparseEmailListUnified(start, sort int) (el *SparseEmailList){
+  /// TODO: MAKE THIS WORK NEXT>
+  /*
+  res = make(map[string]SparseEmailList, 50)
+	cmd := ""
+
+	stmt, _ := s.db.Prepare(cmd)
+	defer stmt.Close()
+	var id int64
+	var flags []byte
+	var perm_flags []byte
+  rows, err := stmt.Query()
+  switch {
+    case err == sql.ErrNoRows:
+      log.Printf("No rows returned.")
+      return
+    case err != nil:
+      log.Printf("\n\nError querying db: %v\n\n", err)
+      return
+  }
+
+  defer rows.Close()
+  for rows.Next() {
+    var status MboxStatus
+    var email string
+
+    err = rows.Scan(&id, &(status.Name), &flags, &perm_flags, &(status.Messages), &(status.Recent), &(status.Unseen), &(status.UIDNext), &(status.UIDValidity), &email)
+    if err != nil {
+      log.Printf("Error scanning row.")
+      err = nil
+    }
+    
+    err = json.Unmarshal(flags, &(status.Flags))
+    if err != nil {
+      log.Printf("Error unmarshalling: %v to Flags", string(flags))
+      err = nil
+    }
+    err = json.Unmarshal(perm_flags, &(status.PermFlags))
+    if err != nil {
+      log.Printf("Error unmarshalling: %v to Flags", string(perm_flags))
+      err = nil
+    }
+    
+    log.Printf("loaded mbox: %v", status)
+
+    // add it to the map
+    //  first, check to see if the map has teh account.
+    //  if so, add to it, otherwise create a new key etcs
+    if _, ok := res[email]; !ok {
+      res[email] = make(MboxSet, 10)
+    }
+    res[email][status.Name] = status
+  }
+  */
+  return nil
 }
