@@ -38,9 +38,11 @@ func syncMail(){
   //imap.DefaultLogMask = imap.LogConn | imap.LogRaw
 	imap.DefaultLogMask = imap.LogConn
 
-	acct := &IMAPAccount{Username: "vfct3st@gmail.com", Password: "GWxE6kBs436wa7tyedyU", Server: GmailServer()}
+  acct := &IMAPAccount{Username: "vfct3st@gmail.com", Password: "GWxE6kBs436wa7tyedyU", Server: GmailServer()}
+  //acct := &IMAPAccount{Username: "srjk", Password: "password", Server: DovecotServer()}
 	ms := NewSqliteMetadata("metadata.sqlite")
-  ep := &SqliteEmailProcessor{folder: "storage"}
+  cs := NewSqliteContactService("storage")
+  ep := &SqliteEmailProcessor{folder: "storage", contactService: cs}
 
 	ic, err := NewIMAPConnection(acct)
 	if err != nil {
