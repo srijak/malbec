@@ -27,6 +27,10 @@ type IMAPConnection struct {
 func GmailServer() (server *IMAPServer) {
 	return &IMAPServer{Host: "imap.gmail.com", Port: 993}
 }
+func DovecotServer() (server *IMAPServer) {
+	return &IMAPServer{Host: "dovecot", Port: 143}
+}
+
 
 func NewIMAPConnection(acct *IMAPAccount) (ic *IMAPConnection, err error) {
 	conn, err := connect(acct.Server)

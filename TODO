@@ -1,0 +1,6 @@
+ok. 
+Downloads new messages.
+Now-> show the messages through a ui.
+  - should be able to scroll throuhg and view messages.
+  For this, it seems like the uids table should have a bunch of more data
+    like: date of message, from, to, subject

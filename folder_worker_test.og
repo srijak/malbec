@@ -1,0 +1,23 @@
+package main
+
+import (
+	. "launchpad.net/gocheck"
+	"log"
+)
+
+type FolderWorkerSuite struct{}
+
+var _ = Suite(&FolderWorkerSuite{})
+
+func (s *FolderWorkerSuite) TestFolderWorker(c *C) {
+	// use this to run a FolderWorker
+	// so, need to set up a MetadataService
+	// to return the test accounts.
+	// then make the syncs work.
+
+	acct := &IMAPAccount{Username: "vfct3st@gmail.com", Password: "GWxE6kBs436wa7tyedyU", Server: GmailServer()}
+	ms := NewSqliteMetadata("metadata.sqlite")
+	fw := NewFolderWorker("INBOX", acct, ms)
+	err := fw.run()
+	log.Printf("ERROR: %v", err)
+}
